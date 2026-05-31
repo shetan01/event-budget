@@ -203,6 +203,67 @@
       font-size: 1.15rem;
       color: #1f3c7b;
     }
+    .share-row {
+      margin-top: 14px;
+      display: flex;
+      justify-content: center;
+    }
+    .share-row button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 12px;
+      background: #2f6df0;
+      color: white;
+      cursor: pointer;
+      font-weight: 700;
+      box-shadow: 0 10px 22px rgba(47, 109, 240, 0.18);
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .share-row button:hover {
+      transform: translateY(-1px);
+      background: #1f4dc4;
+    }
+    .snapshot-banner {
+      display: none;
+      margin: 0 auto 18px;
+      max-width: 780px;
+      padding: 12px 16px;
+      border-radius: 14px;
+      background: #e0f2fe;
+      border: 1px solid #bae6fd;
+      color: #0c4a6e;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .snapshot-banner button {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .toast-message {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      padding: 12px 18px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.92);
+      color: #f8fafc;
+      font-size: 0.95rem;
+      display: none;
+      z-index: 999;
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.22);
+    }
+    .toast-message.show {
+      display: block;
+    }
     .note {
       margin-top: 16px;
       color: #5a6778;
@@ -237,6 +298,10 @@
       <button class="tab-button active" data-tab="day1">Day 1</button>
       <button class="tab-button" data-tab="day2">Day 2</button>
       <button class="tab-button" data-tab="day3">Day 3</button>
+    </div>
+    <div class="snapshot-banner" id="snapshotBanner">
+      📋 Viewing shared budget snapshot
+      <button type="button" id="startFreshButton">🔄 Start Fresh</button>
     </div>
 
     <div id="day1" class="tab-content active" data-day="1">
@@ -438,8 +503,12 @@
       <span>Grand total across all days</span>
       <strong id="grandTotal">$0.00</strong>
     </div>
+    <div class="share-row">
+      <button type="button" id="saveShareButton">📤 Save & Share</button>
+    </div>
     <p class="note">Enter item name, quantity, and price. Totals update live as you type.</p>
     <footer class="page-footer">Designed & built by Sherry Tan · © 2026</footer>
+    <div class="toast-message" id="toastMessage">✅ Link copied!</div>
   </div>
 
   <script>
@@ -455,19 +524,106 @@
       button.addEventListener('click', () => switchTab(button.dataset.tab));
     });
 
+    const saveShareButton = document.getElementById('saveShareButton');
+    const snapshotBanner = document.getElementById('snapshotBanner');
+    const startFreshButton = document.getElementById('startFreshButton');
+    const toastMessage = document.getElementById('toastMessage');
+    let readOnlyMode = false;
+
     function formatMoney(value) {
       return '$' + value.toFixed(2);
+    }
+
+    function collectBudgetData() {
+      return contents.map(section => ({
+        day: section.dataset.day,
+        items: Array.from(section.querySelectorAll('tbody tr')).map(row => ({
+          name: row.querySelector('.item-name').value || '',
+          qty: parseFloat(row.querySelector('.item-qty').value) || 0,
+          price: parseFloat(row.querySelector('.item-price').value) || 0
+        }))
+      }));
+    }
+
+    function encodeBudgetHash(data) {
+      return encodeURIComponent(JSON.stringify(data));
+    }
+
+    function decodeBudgetHash(hash) {
+      try {
+        return JSON.parse(decodeURIComponent(hash));
+      } catch {
+        return null;
+      }
+    }
+
+    function showToast(message) {
+      toastMessage.textContent = message;
+      toastMessage.classList.add('show');
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => toastMessage.classList.remove('show'), 1800);
+    }
+
+    function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return successful ? Promise.resolve() : Promise.reject();
+    }
+
+    function updateHashFromBudget() {
+      const data = collectBudgetData();
+      const hashValue = encodeBudgetHash(data);
+      window.location.hash = hashValue;
+      return window.location.href;
+    }
+
+    function clearSectionRows(section) {
+      section.querySelectorAll('tbody tr').forEach(row => row.remove());
+    }
+
+    function setReadOnlyMode(enabled) {
+      readOnlyMode = enabled;
+      snapshotBanner.style.display = enabled ? 'flex' : 'none';
+      document.querySelectorAll('.tab-content input, .tab-content button, .day-actions button, .quick-add-item').forEach(el => {
+        if (el === saveShareButton || el === startFreshButton) return;
+        el.disabled = enabled;
+      });
+    }
+
+    function loadBudgetFromHash() {
+      const hash = window.location.hash.slice(1);
+      if (!hash) return false;
+      const data = decodeBudgetHash(hash);
+      if (!data || !Array.isArray(data)) return false;
+      contents.forEach(section => clearSectionRows(section));
+      data.forEach(day => {
+        const section = contents.find(sec => sec.dataset.day === String(day.day));
+        if (!section || !Array.isArray(day.items)) return;
+        day.items.forEach(item => addItemToSection(section, item.name));
+      });
+      return true;
     }
 
     function createItemRow(itemName = '') {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><input type="text" class="item-name" placeholder="Item name" value="${itemName}"></td>
+        <td><input type="text" class="item-name" placeholder="Item name"></td>
         <td><input type="number" min="0" step="1" class="item-qty" value="1"></td>
         <td><input type="number" min="0" step="0.01" class="item-price" value="0.00"></td>
         <td class="item-subtotal">$0.00</td>
         <td><button type="button" class="remove-item" aria-label="Remove item">✕</button></td>
       `;
+      tr.querySelector('.item-name').value = itemName;
       return tr;
     }
 
@@ -510,7 +666,7 @@
       section.querySelector('tbody.items-list').appendChild(row);
       wireRowEvents(row, section);
       updateGrandTotal();
-      row.querySelector('.item-name').focus();
+      if (!readOnlyMode) row.querySelector('.item-name').focus();
     }
 
     document.querySelectorAll('.tab-content').forEach(section => {
@@ -522,9 +678,28 @@
           addItemToSection(section, button.dataset.name || '');
         });
       });
-
-      addItemToSection(section);
     });
+
+    saveShareButton.addEventListener('click', () => {
+      const url = updateHashFromBudget();
+      copyToClipboard(url)
+        .then(() => showToast('✅ Link copied!'))
+        .catch(() => showToast('⚠️ Copy failed'));
+    });
+
+    startFreshButton.addEventListener('click', () => {
+      window.location.hash = '';
+      window.location.reload();
+    });
+
+    const isSnapshot = loadBudgetFromHash();
+    document.querySelectorAll('.tab-content').forEach(section => {
+      if (!isSnapshot) addItemToSection(section);
+    });
+
+    if (isSnapshot) {
+      setReadOnlyMode(true);
+    }
 
     updateGrandTotal();
   </script>
