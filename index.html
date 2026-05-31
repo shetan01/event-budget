@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Event Budget Planner</title>
+  <style>
+    :root {
+      font-family: Arial, sans-serif;
+      color: #222;
+      background: #f4f6f8;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      position: relative;
+      width: min(980px, 100%);
+      margin: 24px;
+      padding: 24px;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.08);
+    }
+    .corner-badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      padding: 8px 12px;
+      background: rgba(47, 109, 240, 0.08);
+      color: #1f3c72;
+      border: 1px solid rgba(47, 109, 240, 0.2);
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      box-shadow: 0 8px 20px rgba(47, 109, 240, 0.08);
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.8rem, 2.5vw, 2.5rem);
+      text-align: center;
+    }
+    .subtitle {
+      margin: 0 auto 26px;
+      max-width: 760px;
+      color: #475569;
+      font-size: 1rem;
+      line-height: 1.6;
+      text-align: center;
+    }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .tab-button {
+      padding: 12px 20px;
+      background: #e9edf2;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+      font-weight: 600;
+    }
+    .tab-button.active {
+      background: #2f6df0;
+      color: #fff;
+      transform: translateY(-1px);
+    }
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.25s ease;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .day-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .day-actions button {
+      padding: 11px 18px;
+      border: none;
+      border-radius: 10px;
+      background: #2f6df0;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .quick-add {
+      margin-bottom: 18px;
+      padding: 18px;
+      background: #f6f8fb;
+      border: 1px solid #dfe4ef;
+      border-radius: 14px;
+    }
+    .quick-add-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+      color: #1f3c72;
+    }
+    .quick-add-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    .quick-add-category {
+      background: #fff;
+      border: 1px solid #e3e8f2;
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .quick-add-category .category-name {
+      margin-bottom: 10px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .quick-add-item {
+      display: block;
+      width: 100%;
+      margin-bottom: 8px;
+      padding: 10px 12px;
+      border: none;
+      border-radius: 10px;
+      background: #f4f7ff;
+      color: #1f3c72;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      font-size: 0.95rem;
+    }
+    .quick-add-item:last-of-type {
+      margin-bottom: 0;
+    }
+    .quick-add-item:hover {
+      background: #e8efff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fcfdff;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px #e1e5eb;
+    }
+    th, td {
+      padding: 14px 12px;
+      text-align: left;
+      border-bottom: 1px solid #e8edf3;
+      min-width: 100px;
+    }
+    th {
+      background: #f6f8fb;
+      font-size: 0.95rem;
+      color: #4f5c72;
+    }
+    td input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #c8d0dd;
+      border-radius: 10px;
+      background: #fff;
+      color: #111827;
+      font-size: 0.95rem;
+      box-sizing: border-box;
+    }
+    td input:focus {
+      outline: 2px solid #2f6df0;
+    }
+    .subtotal-row td {
+      border-bottom: none;
+      font-weight: 700;
+      background: #eff4ff;
+    }
+    .subtotal-row td:last-child {
+      color: #1f4071;
+    }
+    .grand-total {
+      margin-top: 26px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 20px 24px;
+      background: #eef5ff;
+      border-radius: 16px;
+      border: 1px solid #d8e4ff;
+      font-size: 1rem;
+    }
+    .grand-total strong {
+      font-size: 1.15rem;
+      color: #1f3c7b;
+    }
+    .note {
+      margin-top: 16px;
+      color: #5a6778;
+      font-size: 0.95rem;
+    }
+    .page-footer {
+      margin: 24px auto 0;
+      padding-top: 16px;
+      max-width: 100%;
+      color: #64748b;
+      font-size: 0.88rem;
+      text-align: center;
+      letter-spacing: 0.02em;
+      border-top: 1px solid #e2e8f0;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 720px) {
+      .day-actions { flex-direction: column; align-items: stretch; }
+      th, td { padding: 12px 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="corner-badge">⚡ by Sherry</div>
+    <h1>Event Budget Planner</h1>
+    <p class="subtitle">A quick collaborative budget planner for event organizers — add items, estimate costs, and get a live total while your team brainstorms.</p>
+    <div class="tabs" role="tablist">
+      <button class="tab-button active" data-tab="day1">Day 1</button>
+      <button class="tab-button" data-tab="day2">Day 2</button>
+      <button class="tab-button" data-tab="day3">Day 3</button>
+    </div>
+
+    <div id="day1" class="tab-content active" data-day="1">
+      <div class="day-actions">
+        <div>Items for Day 1</div>
+        <button type="button" class="add-item">Add item</button>
+      </div>
+      <div class="quick-add">
+        <div class="quick-add-title">Quick Add</div>
+        <div class="quick-add-grid">
+          <div class="quick-add-category">
+            <div class="category-name">Beverages</div>
+            <button type="button" class="quick-add-item" data-name="🥂 Champagne">🥂 Champagne</button>
+            <button type="button" class="quick-add-item" data-name="💧 Water">💧 Water</button>
+            <button type="button" class="quick-add-item" data-name="☕ Coffee & Tea">☕ Coffee & Tea</button>
+            <button type="button" class="quick-add-item" data-name="🧃 Juice">🧃 Juice</button>
+            <button type="button" class="quick-add-item" data-name="🥤 Soft Drinks">🥤 Soft Drinks</button>
+          </div>
+          <div class="quick-add-category">
+            <div class="category-name">Snacks</div>
+            <button type="button" class="quick-add-item" data-name="🍿 Popcorn">🍿 Popcorn</button>
+            <button type="button" class="quick-add-item" data-name="🍟 Chips">🍟 Chips</button>
+            <button type="button" class="quick-add-item" data-name="🧁 Brownies">🧁 Brownies</button>
+            <button type="button" class="quick-add-item" data-name="🍫 Chocolate">🍫 Chocolate</button>
+            <button type="button" class="quick-add-item" data-name="🍓 Fruit Cuts">🍓 Fruit Cuts</button>
+            <button type="button" class="quick-add-item" data-name="🍨 Ice Cream">🍨 Ice Cream</button>
+            <button type="button" class="quick-add-item" data-name="🍰 Dessert Platter">🍰 Dessert Platter</button>
+          </div>
+          <div class="quick-add-category">
+            <div class="category-name">Meals</div>
+            <button type="button" class="quick-add-item" data-name="🥡 Lunch Boxes">🥡 Lunch Boxes</button>
+            <button type="button" class="quick-add-item" data-name="🥪 Sandwiches">🥪 Sandwiches</button>
+            <button type="button" class="quick-add-item" data-name="🥗 Salad Bowls">🥗 Salad Bowls</button>
+          </div>
+          <div class="quick-add-category">
+            <div class="category-name">Event Essentials</div>
+            <button type="button" class="quick-add-item" data-name="🎂 Celebration Cake">🎂 Celebration Cake</button>
+            <button type="button" class="quick-add-item" data-name="🎀 Ribbon Cutting Set">🎀 Ribbon Cutting Set</button>
+            <button type="button" class="quick-add-item" data-name="🌸 Floral Arrangement">🌸 Floral Arrangement</button>
+          </div>
+          <div class="quick-add-category">
+            <div class="category-name">✏️ Others</div>
+            <button type="button" class="quick-add-item" data-name="">✏️ Others</button>
+          </div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Item name</th>
+            <th>Qty</th>
+            <th>Unit price</th>
+            <th>Subtotal</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody class="items-list"></tbody>
+        <tfoot>
+          <tr class="subtotal-row">
+            <td colspan="3">Day 1 subtotal</td>
+            <td class="day-subtotal">$0.00</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div id="day2" class="tab-content" data-day="2">
+      <div class="day-actions">
+        <div>Items for Day 2</div>
+        <button type="button" class="add-item">Add item</button>
+      </div>
+      <div class="quick-add">
+        <div class="quick-add-title">Quick Add</div>
+        <div class="quick-add-grid">
+          <div class="quick-add-category">
+            <div class="category-name">Beverages</div>
+            <button type="button" class="quick-add-item" data-name="🥂 Champagne">🥂 Champagne</button>
+            <button type="button" class="quick-add-item" data-name="💧 Water">💧 Water</button>
+            <button type="button" class="quick-add-item" data-name="☕ Coffee & Tea">☕ Coffee & Tea</button>
+            <button type="button" class="quick-add-item" data-name="🧃 Juice">🧃 Juice</button>
+            <button type="button" class="quick-add-item" data-name="🥤 Soft Drinks">🥤 Soft Drinks</button>
+          </div>
+          <div class="quick-add-category">
+            <div class="category-name">Snacks</div>
+            <button type="button" class="quick-add-item" data-name="🍿 Popcorn">🍿 Popcorn</button>
+            <button type="button" class="quick-add-item" data-name="🍟 Chips">🍟 Chips</button>
+            <button type="button" class="quick-add-item" data-name="🧁 Brownies">🧁 Brownies</button>
+            <button type="button" class="quick-add-item" data-name="🍫 Chocolate">🍫 Chocolate</button>
+            <button type="button" class="quick-add-item" data-name="🍓 Fruit Cuts">🍓 Fruit Cuts</button>
+            <button type="button" class="quick-add-item" data-name="🍨 Ice Cream">🍨 Ice Cream</button>
+            <button type="button" class="quick-add-item" data-name="🍰 Dessert Platter">🍰 Dessert Platter</button>
+          </div>
+          <div class="quick-add-category">
+            <div class="category-name">Meals</div>
+            <button type="button" class="quick-add-item" data-name="🥡 Lunch Boxes">🥡 Lunch Boxes</button>
+            <button type="button" class="quick-add-item" data-name="🥪 Sandwiches">🥪 Sandwiches</button>
+            <button type="button" class="quick-add-item" data-name="🥗 Salad Bowls">🥗 Salad Bowls</button>
+          </div>
+          <div class="quick-add-category">
+            <div class="category-name">Event Essentials</div>
+            <button type="button" class="quick-add-item" data-name="🎂 Celebration Cake">🎂 Celebration Cake</button>
+            <button type="button" class="quick-add-item" data-name="🎀 Ribbon Cutting Set">🎀 Ribbon Cutting Set</button>
+            <button type="button" class="quick-add-item" data-name="🌸 Floral Arrangement">🌸 Floral Arrangement</button>
+          </div>
+          <div class="quick-add-category">
+            <div class="category-name">✏️ Others</div>
+            <button type="button" class="quick-add-item" data-name="">✏️ Others</button>
+          </div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Item name</th>
+            <th>Qty</th>
+            <th>Unit price</th>
+            <th>Subtotal</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody class="items-list"></tbody>
+        <tfoot>
+          <tr class="subtotal-row">
+            <td colspan="3">Day 2 subtotal</td>
+            <td class="day-subtotal">$0.00</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div id="day3" class="tab-content" data-day="3">
+      <div class="day-actions">
+        <div>Items for Day 3</div>
+        <button type="button" class="add-item">Add item</button>
+      </div>
+      <div class="quick-add">
+        <div class="quick-add-title">Quick Add</div>
+        <div class="quick-add-grid">
+          <div class="quick-add-category">
+            <div class="category-name">Beverages</div>
+            <button type="button" class="quick-add-item" data-name="🥂 Champagne">🥂 Champagne</button>
+            <button type="button" class="quick-add-item" data-name="💧 Water">💧 Water</button>
+            <button type="button" class="quick-add-item" data-name="☕ Coffee & Tea">☕ Coffee & Tea</button>
+            <button type="button" class="quick-add-item" data-name="🧃 Juice">🧃 Juice</button>
+            <button type="button" class="quick-add-item" data-name="🥤 Soft Drinks">🥤 Soft Drinks</button>
+          </div>
+          <div class="quick-add-category">
+            <div class="category-name">Snacks</div>
+            <button type="button" class="quick-add-item" data-name="🍿 Popcorn">🍿 Popcorn</button>
+            <button type="button" class="quick-add-item" data-name="🍟 Chips">🍟 Chips</button>
+            <button type="button" class="quick-add-item" data-name="🧁 Brownies">🧁 Brownies</button>
+            <button type="button" class="quick-add-item" data-name="🍫 Chocolate">🍫 Chocolate</button>
+            <button type="button" class="quick-add-item" data-name="🍓 Fruit Cuts">🍓 Fruit Cuts</button>
+            <button type="button" class="quick-add-item" data-name="🍨 Ice Cream">🍨 Ice Cream</button>
+            <button type="button" class="quick-add-item" data-name="🍰 Dessert Platter">🍰 Dessert Platter</button>
+          </div>
+          <div class="quick-add-category">
+            <div class="category-name">Meals</div>
+            <button type="button" class="quick-add-item" data-name="🥡 Lunch Boxes">🥡 Lunch Boxes</button>
+            <button type="button" class="quick-add-item" data-name="🥪 Sandwiches">🥪 Sandwiches</button>
+            <button type="button" class="quick-add-item" data-name="🥗 Salad Bowls">🥗 Salad Bowls</button>
+          </div>
+          <div class="quick-add-category">
+            <div class="category-name">Event Essentials</div>
+            <button type="button" class="quick-add-item" data-name="🎂 Celebration Cake">🎂 Celebration Cake</button>
+            <button type="button" class="quick-add-item" data-name="🎀 Ribbon Cutting Set">🎀 Ribbon Cutting Set</button>
+            <button type="button" class="quick-add-item" data-name="🌸 Floral Arrangement">🌸 Floral Arrangement</button>
+          </div>
+          <div class="quick-add-category">
+            <div class="category-name">✏️ Others</div>
+            <button type="button" class="quick-add-item" data-name="">✏️ Others</button>
+          </div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Item name</th>
+            <th>Qty</th>
+            <th>Unit price</th>
+            <th>Subtotal</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody class="items-list"></tbody>
+        <tfoot>
+          <tr class="subtotal-row">
+            <td colspan="3">Day 3 subtotal</td>
+            <td class="day-subtotal">$0.00</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="grand-total">
+      <span>Grand total across all days</span>
+      <strong id="grandTotal">$0.00</strong>
+    </div>
+    <p class="note">Enter item name, quantity, and price. Totals update live as you type.</p>
+    <footer class="page-footer">Designed & built by Sherry Tan · © 2026</footer>
+  </div>
+
+  <script>
+    const tabs = Array.from(document.querySelectorAll('.tab-button'));
+    const contents = Array.from(document.querySelectorAll('.tab-content'));
+
+    function switchTab(tabKey) {
+      tabs.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabKey));
+      contents.forEach(content => content.classList.toggle('active', content.id === tabKey));
+    }
+
+    tabs.forEach(button => {
+      button.addEventListener('click', () => switchTab(button.dataset.tab));
+    });
+
+    function formatMoney(value) {
+      return '$' + value.toFixed(2);
+    }
+
+    function createItemRow(itemName = '') {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" class="item-name" placeholder="Item name" value="${itemName}"></td>
+        <td><input type="number" min="0" step="1" class="item-qty" value="1"></td>
+        <td><input type="number" min="0" step="0.01" class="item-price" value="0.00"></td>
+        <td class="item-subtotal">$0.00</td>
+        <td><button type="button" class="remove-item" aria-label="Remove item">✕</button></td>
+      `;
+      return tr;
+    }
+
+    function updateRowSubtotal(row) {
+      const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+      const price = parseFloat(row.querySelector('.item-price').value) || 0;
+      const subtotal = qty * price;
+      row.querySelector('.item-subtotal').textContent = formatMoney(subtotal);
+      return subtotal;
+    }
+
+    function updateDaySubtotal(section) {
+      const rows = Array.from(section.querySelectorAll('tbody .item-subtotal'));
+      const subtotal = rows.reduce((acc, cell) => acc + (parseFloat(cell.textContent.replace(/[^\d.-]/g, '')) || 0), 0);
+      section.querySelector('.day-subtotal').textContent = formatMoney(subtotal);
+      return subtotal;
+    }
+
+    function updateGrandTotal() {
+      const total = contents.reduce((acc, section) => acc + updateDaySubtotal(section), 0);
+      document.getElementById('grandTotal').textContent = formatMoney(total);
+    }
+
+    function wireRowEvents(row, section) {
+      const inputs = row.querySelectorAll('input');
+      inputs.forEach(input => {
+        input.addEventListener('input', () => {
+          updateRowSubtotal(row);
+          updateGrandTotal();
+        });
+      });
+      row.querySelector('.remove-item').addEventListener('click', () => {
+        row.remove();
+        updateGrandTotal();
+      });
+    }
+
+    function addItemToSection(section, itemName = '') {
+      const row = createItemRow(itemName);
+      section.querySelector('tbody.items-list').appendChild(row);
+      wireRowEvents(row, section);
+      updateGrandTotal();
+      row.querySelector('.item-name').focus();
+    }
+
+    document.querySelectorAll('.tab-content').forEach(section => {
+      const addButton = section.querySelector('.add-item');
+      addButton.addEventListener('click', () => addItemToSection(section));
+
+      section.querySelectorAll('.quick-add-item').forEach(button => {
+        button.addEventListener('click', () => {
+          addItemToSection(section, button.dataset.name || '');
+        });
+      });
+
+      addItemToSection(section);
+    });
+
+    updateGrandTotal();
+  </script>
+</body>
+</html>
