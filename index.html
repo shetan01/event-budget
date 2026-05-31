@@ -605,6 +605,16 @@
       if (!hash) return false;
       const data = decodeBudgetHash(hash);
       if (!data || !Array.isArray(data)) return false;
+
+      // Only treat the hash as a snapshot when it contains meaningful items
+      const hasMeaningful = data.some(d => Array.isArray(d.items) && d.items.some(it => {
+        const name = (it.name || '').toString().trim();
+        const qty = Number(it.qty || 0);
+        const price = Number(it.price || 0);
+        return name !== '' || qty !== 0 || price !== 0;
+      }));
+      if (!hasMeaningful) return false;
+
       contents.forEach(section => clearSectionRows(section));
       data.forEach(day => {
         const section = contents.find(sec => sec.dataset.day === String(day.day));
@@ -688,8 +698,16 @@
     });
 
     startFreshButton.addEventListener('click', () => {
-      window.location.hash = '';
-      window.location.reload();
+      // Remove hash from URL without navigating and restore editable blank mode
+      try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) { window.location.hash = ''; }
+      contents.forEach(section => {
+        clearSectionRows(section);
+        addItemToSection(section);
+      });
+      setReadOnlyMode(false);
+      updateGrandTotal();
+      snapshotBanner.style.display = 'none';
+      showToast('Cleared snapshot — ready to edit');
     });
 
     const isSnapshot = loadBudgetFromHash();
