@@ -207,6 +207,8 @@
       margin-top: 14px;
       display: flex;
       justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
     .share-row button {
       padding: 12px 20px;
@@ -233,7 +235,6 @@
       border: 1px solid #bae6fd;
       color: #0c4a6e;
       font-weight: 700;
-      display: flex;
       align-items: center;
       justify-content: center;
       gap: 12px;
@@ -505,12 +506,15 @@
     </div>
     <div class="share-row">
       <button type="button" id="saveShareButton">📤 Save & Share</button>
+      <button type="button" id="downloadPdfButton">📄 Download PDF</button>
     </div>
     <p class="note">Enter item name, quantity, and price. Totals update live as you type.</p>
     <footer class="page-footer">Designed & built by Sherry Tan · © 2026</footer>
     <div class="toast-message" id="toastMessage">✅ Link copied!</div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/3.0.3/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/5.0.2/jspdf.plugin.autotable.min.js"></script>
   <script>
     const tabs = Array.from(document.querySelectorAll('.tab-button'));
     const contents = Array.from(document.querySelectorAll('.tab-content'));
@@ -525,6 +529,7 @@
     });
 
     const saveShareButton = document.getElementById('saveShareButton');
+    const downloadPdfButton = document.getElementById('downloadPdfButton');
     const snapshotBanner = document.getElementById('snapshotBanner');
     const startFreshButton = document.getElementById('startFreshButton');
     const toastMessage = document.getElementById('toastMessage');
@@ -595,7 +600,7 @@
       readOnlyMode = enabled;
       snapshotBanner.style.display = enabled ? 'flex' : 'none';
       document.querySelectorAll('.tab-content input, .tab-content button, .day-actions button, .quick-add-item').forEach(el => {
-        if (el === saveShareButton || el === startFreshButton) return;
+        if (el === saveShareButton || el === startFreshButton || el === downloadPdfButton) return;
         el.disabled = enabled;
       });
     }
@@ -696,6 +701,100 @@
         .then(() => showToast('✅ Link copied!'))
         .catch(() => showToast('⚠️ Copy failed'));
     });
+
+    function sanitizeForPdf(text) {
+      // jsPDF's standard fonts only support Latin text, so strip emoji/symbols
+      // (e.g. quick-add labels like "🥂 Champagne") to avoid garbled glyphs.
+      return text.replace(/[^\x00-\x7F]/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    function downloadBudgetPdf() {
+      if (!window.jspdf || !window.jspdf.jsPDF) {
+        showToast('⚠️ PDF library failed to load');
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 40;
+      let y = 50;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(20);
+      doc.setTextColor(31, 60, 123);
+      doc.text('Event Budget Planner', pageWidth / 2, y, { align: 'center' });
+
+      y += 18;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      const generatedOn = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+      doc.text(`Generated on ${generatedOn}`, pageWidth / 2, y, { align: 'center' });
+
+      y += 26;
+
+      contents.forEach(section => {
+        const dayNumber = section.dataset.day;
+        const rows = Array.from(section.querySelectorAll('tbody tr')).map(row => {
+          const rawName = (row.querySelector('.item-name').value || '').trim();
+          const name = sanitizeForPdf(rawName) || 'Untitled item';
+          const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+          const price = parseFloat(row.querySelector('.item-price').value) || 0;
+          return [name, qty.toString(), formatMoney(price), formatMoney(qty * price)];
+        });
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(13);
+        doc.setTextColor(31, 60, 123);
+        doc.text(`Day ${dayNumber}`, margin, y);
+        y += 8;
+
+        doc.autoTable({
+          startY: y,
+          margin: { left: margin, right: margin },
+          head: [['Item', 'Qty', 'Unit price', 'Subtotal']],
+          body: rows.length
+            ? rows
+            : [[{ content: 'No items added yet', colSpan: 4, styles: { halign: 'center', textColor: [148, 163, 184] } }]],
+          foot: [[
+            { content: `Day ${dayNumber} subtotal`, colSpan: 3, styles: { halign: 'right' } },
+            section.querySelector('.day-subtotal').textContent
+          ]],
+          theme: 'grid',
+          styles: { fontSize: 10, cellPadding: 6, lineColor: [225, 229, 235] },
+          headStyles: { fillColor: [47, 109, 240], textColor: [255, 255, 255], fontStyle: 'bold' },
+          footStyles: { fillColor: [239, 244, 255], textColor: [31, 64, 113], fontStyle: 'bold' },
+          columnStyles: {
+            1: { cellWidth: 50, halign: 'right' },
+            2: { cellWidth: 80, halign: 'right' },
+            3: { cellWidth: 80, halign: 'right' }
+          }
+        });
+
+        y = doc.lastAutoTable.finalY + 24;
+      });
+
+      if (y + 40 > pageHeight - margin) {
+        doc.addPage();
+        y = 50;
+      }
+
+      doc.setFillColor(238, 245, 255);
+      doc.roundedRect(margin, y, pageWidth - margin * 2, 36, 8, 8, 'F');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12);
+      doc.setTextColor(31, 60, 123);
+      doc.text('Grand total across all days', margin + 14, y + 23);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text(document.getElementById('grandTotal').textContent, pageWidth - margin - 14, y + 23, { align: 'right' });
+
+      doc.save('event-budget-plan.pdf');
+    }
+
+    downloadPdfButton.addEventListener('click', downloadBudgetPdf);
 
     startFreshButton.addEventListener('click', () => {
       // Remove hash from URL without navigating and restore editable blank mode
